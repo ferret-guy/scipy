@@ -929,6 +929,27 @@ class TestHypergeom(object):
 
 class TestLoggamma(object):
 
+    # Expected sf values were computed with mpmath. For given x and c,
+    #     x = mpmath.mpf(x)
+    #     c = mpmath.mpf(c)
+    #     sf = mpmath.gammainc(c, mpmath.exp(x), mpmath.inf,
+    #                          regularized=True)
+    @pytest.mark.parametrize('x, c, sf', [(4, 1.5, 1.6341528919488565e-23),
+                                          (6, 100, 8.23836829202024e-74)])
+    def test_sf_isf(self, x, c, sf):
+        s = stats.loggamma.sf(x, c)
+        assert_allclose(s, sf, rtol=1e-12)
+        y = stats.loggamma.isf(s, c)
+        assert_allclose(y, x, rtol=1e-12)
+
+    def test_logpdf(self):
+        # Test logpdf with x=-500, c=2.  ln(gamma(2)) = 0, and
+        # exp(-500) ~= 7e-218, which is far smaller than the ULP
+        # of c*x=-1000, so logpdf(-500, 2) = c*x - exp(x) - ln(gamma(2))
+        # should give -1000.0.
+        lp = stats.loggamma.logpdf(-500, 2)
+        assert_allclose(lp, -1000.0, rtol=1e-14)
+
     def test_stats(self):
         # The following precomputed values are from the table in section 2.2
         # of "A Statistical Study of Log-Gamma Distribution", by Ping Shing
@@ -2132,6 +2153,51 @@ class TestRvDiscrete(object):
         # also check the second moment
         assert_allclose(rv.expect(lambda x: x**2),
                         sum(v**2 * w for v, w in zip(y, py)), atol=1e-14)
+
+
+class TestSkewCauchy(object):
+    def test_cauchy(self):
+        x = np.linspace(-5, 5, 100)
+        assert_array_almost_equal(stats.skewcauchy.pdf(x, a=0),
+                                  stats.cauchy.pdf(x))
+        assert_array_almost_equal(stats.skewcauchy.cdf(x, a=0),
+                                  stats.cauchy.cdf(x))
+        assert_array_almost_equal(stats.skewcauchy.ppf(x, a=0),
+                                  stats.cauchy.ppf(x))
+
+    def test_skewcauchy_R(self):
+        # options(digits=16)
+        # library(sgt)
+        # # lmbda, x contain the values generated for a, x below
+        # lmbda <- c(0.0976270078546495, 0.430378732744839, 0.2055267521432877,
+        #            0.0897663659937937, -0.15269040132219, 0.2917882261333122,
+        #            -0.12482557747462, 0.7835460015641595, 0.9273255210020589,
+        #            -0.2331169623484446)
+        # x <- c(2.917250380826646, 0.2889491975290444, 0.6804456109393229,
+        #        4.25596638292661, -4.289639418021131, -4.1287070029845925,
+        #        -4.797816025596743, 3.32619845547938, 2.7815675094985046,
+        #        3.700121482468191)
+        # pdf = dsgt(x, mu=0, lambda=lambda, sigma=1, q=1/2, mean.cent=FALSE,
+        #            var.adj = sqrt(2))
+        # cdf = psgt(x, mu=0, lambda=lambda, sigma=1, q=1/2, mean.cent=FALSE,
+        #            var.adj = sqrt(2))
+        # qsgt(cdf, mu=0, lambda=lambda, sigma=1, q=1/2, mean.cent=FALSE,
+        #      var.adj = sqrt(2))
+
+        np.random.seed(0)
+        a = np.random.rand(10) * 2 - 1
+        x = np.random.rand(10) * 10 - 5
+        pdf = [0.039473975217333909, 0.305829714049903223, 0.24140158118994162,
+               0.019585772402693054, 0.021436553695989482, 0.00909817103867518,
+               0.01658423410016873, 0.071083288030394126, 0.103250045941454524,
+               0.013110230778426242]
+        cdf = [0.87426677718213752, 0.37556468910780882, 0.59442096496538066,
+               0.91304659850890202, 0.09631964100300605, 0.03829624330921733,
+               0.08245240578402535, 0.72057062945510386, 0.62826415852515449,
+               0.95011308463898292]
+        assert_allclose(stats.skewcauchy.pdf(x, a), pdf)
+        assert_allclose(stats.skewcauchy.cdf(x, a), cdf)
+        assert_allclose(stats.skewcauchy.ppf(cdf, a), x)
 
 
 class TestSkewNorm(object):
